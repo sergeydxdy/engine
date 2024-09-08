@@ -1,8 +1,8 @@
 from tkinter import *
-
+from random import randint
 
 class Ball:
-    def __init__(self, canvas, radius, coordinates, speed=(0, 0), color='white'):
+    def __init__(self, canvas, radius, coordinates, speed=(0, 0), color='white', mass=1):
         self.canvas = canvas
         self.radius = radius
         self.color = color
@@ -10,8 +10,9 @@ class Ball:
         self.y = coordinates[1]
         self.vx = speed[0]
         self.vy = speed[1]
-        self.elasticity = 0.75
-        self.friction = 0.99
+        self.elasticity = 1
+        self.friction = 1
+        self.mass=1
 
         self.id = self.canvas.create_oval(self.x - self.radius, self.y - self.radius,
                                           self.x + self.radius, self.y + self.radius,
@@ -52,7 +53,7 @@ class Ball:
 
 
 class Scene:
-    def __init__(self, objects=None):
+    def __init__(self, objects=[]):
         self.height = 640
         self.width = 1024
         self.fps_limit = 1000
@@ -68,28 +69,40 @@ class Scene:
 
         self.canvas = Canvas(self.window, bg=self.bg_color, height=self.height, width=self.width)
         self.canvas.pack()
-    def add_ball(self):
-        pass
+
+    def add_ball(self, event):
+        colors = ["white",
+                  "cyan",
+                  "magenta",
+                  "red",
+                  "blue",
+                  "gray",
+                  'green',
+                  'orange'
+                   ]
+        radius = randint(5, 50)
+        x = event.x
+        y = event.y
+        vx = randint(-100, 100)
+        vy = randint(-100, 100)
+        color = colors[randint(0, len(colors)-1)]
+        new_ball = Ball(scene.canvas, radius=radius, coordinates=(x, y), speed=(vx, vy), color=color)
+        self.objects.append(new_ball)
 
     def next_frame(self):
         #self.canvas.delete('all')
         for object in self.objects:
             object.update_coordinates()
-
+        self.window.bind('<Button-1>', self.add_ball)
         self.window.after(int(self.tick_time), self.next_frame)
 
     def loop(self):
+
         self.next_frame()
         self.window.mainloop()
 
 scene = Scene()
 
-ball_1 = Ball(scene.canvas, 10, (100, 400), speed=(-50, 0))
-ball_2 = Ball(scene.canvas, 10, (300, 250), speed=(10, 0), color='pink')
-ball_3 = Ball(scene.canvas, 10, (300, 450), speed=(100, 0), color='red')
-ball_4 = Ball(scene.canvas, 20, (300, 150), speed=(-25, 0), color='green')
-
-scene.objects = [ball_1, ball_2, ball_3, ball_4]
 scene.loop()
 
 
