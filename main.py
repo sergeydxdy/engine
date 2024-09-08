@@ -69,7 +69,7 @@ class Scene:
         self.canvas = Canvas(self.window, bg=self.bg_color, height=self.height, width=self.width)
         self.canvas.pack()
     def add_ball(self):
-
+        pass
 
     def next_frame(self):
         #self.canvas.delete('all')
