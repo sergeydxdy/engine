@@ -45,7 +45,7 @@ class Ball:
             self.vy *= self.friction
 
     def update_coordinates(self):
-        self.canvas_collision()
+        #self.canvas_collision()
         self.vy += scene.g * scene.update_time
         self.y += self.vy * scene.update_time
         self.x += self.vx * scene.update_time
@@ -56,14 +56,14 @@ class Ball:
 class Scene:
     def __init__(self, objects=[]):
         self.height = 1024
-        self.width = 1024
+        self.width = 1536
         self.fps_limit = 100
         self.tick_time = 100 / self.fps_limit
-        self.update_time = 0.2
+        self.update_time = 0.0001
         self.bg_color = 'black'
         self.g = 0
         self.objects = objects
-        self.G = 5
+        self.G = 0.1
 
         self.window = Tk()
         self.window.title('Engine')
@@ -82,7 +82,7 @@ class Scene:
                   'green',
                   'orange'
                    ]
-        radius = randint(1, 1)
+        radius = randint(1, 88)
         x = event.x
         y = event.y
         vx = randint(0, 0)
@@ -282,12 +282,7 @@ scene = Scene()
 
 
 
-ball_1 = Ball(scene. canvas, radius=1, coordinates=(0, 0), speed=(0, 0), mass=1, color='blue')
-ball_2 = Ball(scene. canvas, radius=1, coordinates=(1024, 0), speed=(0, 0), mass=1, color='pink')
-ball_3 = Ball(scene. canvas, radius=1, coordinates=(1024, 1024), speed=(0, 0), mass=1, color='red')
-ball_4 = Ball(scene. canvas, radius=1, coordinates=(0, 1024), speed=(0, 0), mass=1, color='cyan')
 
-scene.objects = [ball_1, ball_2, ball_3, ball_4]
 
 scene.loop()
 
