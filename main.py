@@ -1,10 +1,11 @@
-from tkinter import Tk, Canvas
+import pygame, pygame.gfxdraw
 from random import randint
-from math import atan2, cos, sin, sqrt, pi
+from functions import *
+
 
 class Ball:
-    def __init__(self, canvas, radius, coordinates, speed=(0, 0), color='white', mass=4e-4):
-        self.canvas = canvas
+    def __init__(self, scene=None, radius=10, coordinates=(0, 0), speed=(0, 0), color=(255, 255, 255)):
+        self.scene = scene
         self.radius = radius
         self.color = color
         self.x = coordinates[0]
@@ -13,15 +14,11 @@ class Ball:
         self.vy = speed[1]
         self.elasticity = 0.5
         self.friction = 1
-        self.volume = (4/3) * pi * radius ** 3
+        self.volume = (4 / 3) * pi * radius ** 3
         self.density = 1e-5
         self.mass = self.volume * self.density
 
-        self.id = self.canvas.create_oval(self.x - self.radius, self.y - self.radius,
-                                          self.x + self.radius, self.y + self.radius,
-                                          fill=self.color, outline='')
-
-    def canvas_collision(self):
+    def canvas_borders_collision(self):
         if self.y >= scene.height - self.radius:
             self.y += (scene.height - self.y) - self.radius
             self.vy *= -self.elasticity
@@ -45,180 +42,96 @@ class Ball:
             self.vy *= self.friction
 
     def update_coordinates(self):
-        #self.canvas_collision()
+        self.canvas_borders_collision()
         self.vy += scene.g * scene.update_time
         self.y += self.vy * scene.update_time
         self.x += self.vx * scene.update_time
-        self.canvas.coords(self.id, self.x - self.radius, self.y - self.radius,
-                           self.x + self.radius, self.y + self.radius)
+
+    def draw(self):
+        pygame.gfxdraw.aacircle(self.scene.window,
+                                int(self.x), int(self.y), self.radius, self.color)
+        pygame.gfxdraw.filled_circle(self.scene.window,
+                                     int(self.x), int(self.y), self.radius, self.color)
 
 
 class Scene:
-    def __init__(self, objects=[]):
-        self.height = 1024
-        self.width = 1536
+    def __init__(self, objects: list):
+        self.height = 768
+        self.width = 1000
         self.fps_limit = 100
         self.tick_time = 100 / self.fps_limit
-        self.update_time = 0.0001
+        self.update_time = 0.01
         self.bg_color = 'black'
         self.g = 0
         self.objects = objects
-        self.G = 0.1
+        for obj in self.objects:
+            obj.scene = self
+        self.G = 1
 
-        self.window = Tk()
-        self.window.title('Engine')
-        self.window.resizable(False, False)
+        pygame.init()
+        self.window = pygame.display.set_mode((self.width, self.height))
+        self.clock = pygame.time.Clock()
 
-        self.canvas = Canvas(self.window, bg=self.bg_color, height=self.height, width=self.width)
-        self.canvas.pack()
+        self.running = True
 
-    def add_ball(self, event):
-        colors = ["white",
-                  "cyan",
-                  "magenta",
-                  "red",
-                  "blue",
-                  "gray",
-                  'green',
-                  'orange'
-                   ]
-        radius = randint(1, 88)
-        x = event.x
-        y = event.y
+    def add_new_ball(self, event):
+        colors = (
+            (255, 255, 255),
+            (255, 0, 0),
+            (0, 255, 0),
+            (0, 0, 255),
+            (255, 255, 0),
+            (255, 0, 255),
+            (0, 255, 255)
+        )
+        radius = randint(30, 30)
+        x = event.pos[0]
+        y = event.pos[1]
         vx = randint(0, 0)
         vy = randint(0, 0)
-        color = colors[randint(0, len(colors)-1)]
-        new_ball = Ball(scene.canvas, radius=radius, coordinates=(x, y), speed=(vx, vy), color=color)
+        color = colors[randint(0, len(colors) - 1)]
+        new_ball = Ball(self, radius=radius, coordinates=(x, y), speed=(vx, vy), color=color)
         self.objects.append(new_ball)
 
-    def g_force(self, x1, y1, x2, y2, m2):
-        phi = atan2(y2-y1, x2-x1)
-        r_2 = (x2-x1)**2+(y2-y1)**2
-
-        a = (scene.G * m2) / r_2
-        ax = a * cos(phi)
-        ay = a * sin(phi)
-        return ax, ay
-
-    def all_g_force(self, object):
-        x = object.x
-        y = object.y
+    def all_g_force(self, object_1):
         sum_ax = 0
         sum_ay = 0
-        for obj in scene.objects:
-            if object == obj:
-                sum_ax += 0
-                sum_ay += 0
-            else:
-                ax, ay = self.g_force(x, y, obj.x, obj.y, obj.mass)
+        for object_2 in self.objects:
+            if object_1 != object_2:
+                ax, ay = calculate_gravitational_acceleration(self.G, object_1, object_2)
                 sum_ax += ax
                 sum_ay += ay
+
         return sum_ax, sum_ay
 
-    def update_by_grav(self, object):
-        ax, ay, = self.all_g_force(object)
+    def update_by_gravity(self, object_1):
+        ax, ay = self.all_g_force(object_1)
         dvx = ax / self.update_time
         dvy = ay / self.update_time
 
-        object.vx += dvx
-        object.vy += dvy
+        object_1.vx += dvx
+        object_1.vy += dvy
 
-        object.x += object.vx * self.update_time
-        object.y += object.vy * self.update_time
+        object_1.x += object_1.vx * self.update_time
+        object_1.y += object_1.vy * self.update_time
 
-    def is_collision(self, object_1, object_2):
-
-        l_2 = (object_2.x - object_1.x) ** 2 + (object_2.y - object_1.y) ** 2
-
-        if object_1 != object_2 and l_2 <= (object_2.radius + object_1.radius)**2:
-            return True
-        else:
-            return False
-
-    def collision_depth(self, object_1, object_2):
-        l = sqrt((object_2.x-object_1.x)**2+(object_2.y-object_1.y)**2)
-
-        if l < object_2.radius + object_1.radius:
-            phi = atan2(object_2.y - object_1.y, object_2.x - object_1.x)
-            depth = object_2.radius + object_1.radius - l
-
-            depth_x = depth*cos(phi)
-            depth_y = depth*sin(phi)
-
-            move_1x = depth_x / 2
-            move_1y = depth_y / 2
-            move_2x = move_1x
-            move_2y = move_1y
-        else:
-            move_1x, move_1y, move_2x, move_2y = 0, 0, 0, 0
-
-        return -move_1x, -move_1y, move_2x, move_2y
-
-    def move_by_collision(self, object1):
-        for object2 in scene.objects:
-            if object1 == object2:
-                continue
-            elif self.collision_depth(object1, object2):
-                move_1x, move_1y, move_2x, move_2y = self.collision_depth(object1, object2)
-                object1.x += move_1x
-                object1.y += move_1y
-                object2.x += move_2x
-                object2.y += move_2y
-
-    def collide(self, obj1, obj2):
-
-        if self.is_collision(obj1, obj2):
-
-            vx1 = obj1.vx
-            vy1 = obj1.vy
-            v1 = sqrt(vx1 ** 2 + vy1 ** 2)
-            m1 = obj1.mass
-            theta1 = atan2(vy1, vx1)
-
-            vx2 = obj2.vx
-            vy2 = obj2.vy
-            v2 = sqrt(vx2 ** 2 + vy2 ** 2)
-            m2 = obj2.mass
-            theta2 = atan2(vy2, vx2)
-
-            phi = atan2((obj2.y - obj1.y), (obj2.x - obj1.x))
-
-            v1x_new = ((v1 * cos(theta1 - phi) * (m1 - m2) + 2 * m2 * v2 * cos(theta2 - phi)) / (m1 + m2)) * cos(
-                phi) + v1 * sin(theta1 - phi) * cos(phi + pi / 2)
-            v1y_new = ((v1 * cos(theta1 - phi) * (m1 - m2) + 2 * m2 * v2 * cos(theta2 - phi)) / (m1 + m2)) * sin(
-                phi) + v1 * sin(theta1 - phi) * sin(phi + pi / 2)
-
-            v2x_new = ((v2 * cos(theta2 - phi) * (m2 - m1) + 2 * m1 * v1 * cos(theta1 - phi)) / (m1 + m2)) * cos(
-                phi) + v2 * sin(theta2 - phi) * cos(phi + pi / 2)
-            v2y_new = ((v2 * cos(theta2 - phi) * (m2 - m1) + 2 * m1 * v1 * cos(theta1 - phi)) / (m1 + m2)) * sin(
-                phi) + v2 * sin(theta2 - phi) * sin(phi + pi / 2)
-
-            obj1.vx, obj1.vy = v1x_new, v1y_new
-            obj2.vx, obj2.vy = v2x_new, v2y_new
-
-            obj1.x += obj1.vx * scene.update_time
-            obj1.y += obj1.vy * scene.update_time
-            obj2.x += obj2.vx * scene.update_time
-            obj2.y += obj2.vy * scene.update_time
-
-    def pro_collide(self, obj1, obj2):
-        if self.is_collision(obj1, obj2):
-
+    def collide(self, object_1, object_2):
+        if is_collision(object_1, object_2):
             k = 0.1
 
-            vx1 = obj1.vx
-            vy1 = obj1.vy
+            vx1 = object_1.vx
+            vy1 = object_1.vy
             v1 = sqrt(vx1 ** 2 + vy1 ** 2)
-            m1 = obj1.mass
+            m1 = object_1.mass
             theta1 = atan2(vy1, vx1)
 
-            vx2 = obj2.vx
-            vy2 = obj2.vy
+            vx2 = object_2.vx
+            vy2 = object_2.vy
             v2 = sqrt(vx2 ** 2 + vy2 ** 2)
-            m2 = obj2.mass
+            m2 = object_2.mass
             theta2 = atan2(vy2, vx2)
 
-            phi = atan2((obj2.y - obj1.y), (obj2.x - obj1.x))
+            phi = atan2((object_2.y - object_1.y), (object_2.x - object_1.x))
 
             v1new = v1 - (1 + k) * (m2 / (m2 + m1)) * (v1 - v2)
             v2new = v2 + (1 + k) * (m1 / (m2 + m1)) * (v1 - v2)
@@ -236,13 +149,13 @@ class Scene:
             v2y_new = ((v2 * cos(theta2 - phi) * (m2 - m1) + 2 * m1 * v1 * cos(theta1 - phi)) / (m1 + m2)) * sin(
                 phi) + v2 * sin(theta2 - phi) * sin(phi + pi / 2)
 
-            obj1.vx, obj1.vy = v1x_new, v1y_new
-            obj2.vx, obj2.vy = v2x_new, v2y_new
+            object_1.vx, object_1.vy = v1x_new, v1y_new
+            object_2.vx, object_2.vy = v2x_new, v2y_new
 
-            obj1.x += obj1.vx * scene.update_time
-            obj1.y += obj1.vy * scene.update_time
-            obj2.x += obj2.vx * scene.update_time
-            obj2.y += obj2.vy * scene.update_time
+            object_1.x += object_1.vx * self.update_time
+            object_1.y += object_1.vy * self.update_time
+            object_2.x += object_2.vx * self.update_time
+            object_2.y += object_2.vy * self.update_time
 
     def collisions_manager(self):
         collisions = []
@@ -250,40 +163,50 @@ class Scene:
         for obj1 in self.objects:
             for obj2 in self.objects:
                 if obj1 != obj2:
-                    collisions.append(self.is_collision(obj1, obj2))
-                    self.pro_collide(obj1, obj2)
+                    collisions.append(is_collision(obj1, obj2))
+                    self.collide(obj1, obj2)
 
         if any(collisions):
-            for obj1 in self.objects:
-                self.move_by_collision(obj1)
+            for object_1 in self.objects:
+                for object_2 in self.objects:
+                    displace_by_intersection(object_1, object_2)
 
+    def update_frame(self):
+        self.collisions_manager()
+        for object_1 in self.objects:
+            object_1.update_coordinates()
+            self.update_by_gravity(object_1)
+            object_1.draw()
 
-    def gravity_manager(self):
-        for obj in self.objects:
-            obj.update_coordinates()
-            self.update_by_grav(obj)
+    def update_ui(self):
+        self.window.fill(self.bg_color)
+        self.update_frame()
+        pygame.display.flip()
+
+    def tick(self):
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                self.add_new_ball(event)
+            elif event.type == pygame.QUIT:
+                self.running = False
 
     def next_frame(self):
-
-        self.collisions_manager()
-        self.gravity_manager()
-        self.window.bind('<Button-1>', self.add_ball)
-        self.canvas.update_idletasks()
-        self.window.after(int(self.tick_time), self.next_frame)
-
+        self.tick()
+        self.clock.tick(60)
+        self.update_ui()
 
     def loop(self):
-        self.next_frame()
-        self.window.mainloop()
+        while self.running:
+            self.next_frame()
+        pygame.quit()
 
 
-scene = Scene()
+sun = Ball(scene=None, radius=5, coordinates=(500, 500), speed=(0, 0), color=(255, 255, 0))
+sun.mass = 1000
+comet = Ball(scene=None, radius=1, coordinates=(500, 100), speed=(30, 0), color=(255, 255, 255))
+objects = [sun, comet]
 
+if __name__ == '__main__':
+    scene = Scene(objects=objects)
 
-
-
-
-
-scene.loop()
-
-
+    scene.loop()
